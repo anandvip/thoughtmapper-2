@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thought Mapper with Editable Grid</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100%;
+        }
+        .container {
+            display: flex;
+            height: 100%;
+        }
+        aside {
+            width: 250px;
+            background: #f4f4f4;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        main {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            display: inline-block;
+            padding: 10px;
+            background: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #4cae4c;
+        }
+        #message {
+            color: #5cb85c;
+            margin-bottom: 10px;
+        }
+        .project-item {
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+        .project-item:hover {
+            background: #e9e9e9;
+        }
+        .project-item.active {
+            background: #5cb85c;
+            color: white;
+        }
+        #thoughts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .thought-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .thought-content {
+            min-height: 100px;
+            padding: 5px;
+            margin-bottom: 10px;
+            border: 1px solid transparent;
+        }
+        .thought-content:focus {
+            outline: none;
+            border-color: #5cb85c;
+        }
+        .thought-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .color-picker {
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 50%;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .delete-btn {
+            background: #d9534f;
+        }
+        .delete-btn:hover {
+            background: #c9302c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside>
+            <h2>Projects</h2>
+            <input type="text" id="projectName" placeholder="Enter project name">
+            <button onclick="addProject()">Add Project</button>
+            <div id="projectList"></div>
+        </aside>
+        <main>
+            <h1>Thought Mapper</h1>
+            <div id="message"></div>
+            
+            <h2>Add Thought</h2>
+            <textarea id="newThought" placeholder="Enter your thought"></textarea>
+            <button onclick="addThought()">Add Thought</button>
+            
+            <h2>Thoughts</h2>
+            <div id="thoughts-grid"></div>
+        </main>
+    </div>
+
+    <script>
+    let activeProjectId = null;
+
+    function showMessage(text, isError = false) {
+        const message = document.getElementById('message');
+        message.textContent = text;
+        message.style.color = isError ? '#d9534f' : '#5cb85c';
+    }
+
+    function getProjects() {
+        return JSON.parse(localStorage.getItem('projects')) || [];
+    }
+
+    function getThoughts() {
+        return JSON.parse(localStorage.getItem('thoughts')) || [];
+    }
+
+    function saveProjects(projects) {
+        localStorage.setItem('projects', JSON.stringify(projects));
+    }
+
+    function saveThoughts(thoughts) {
+        localStorage.setItem('thoughts', JSON.stringify(thoughts));
+    }
+
+    function addProject() {
+        const name = document.getElementById('projectName').value.trim();
+        if (!name) {
+            showMessage('Please enter a project name', true);
+            return;
+        }
+
+        const projects = getProjects();
+        const newProject = { id: Date.now(), name };
+        projects.push(newProject);
+        saveProjects(projects);
+
+        document.getElementById('projectName').value = '';
+        showMessage('Project added successfully');
+        loadProjects();
+        selectProject(newProject.id);
+    }
+
+    function loadProjects() {
+        const projects = getProjects();
+        const projectList = document.getElementById('projectList');
+        projectList.innerHTML = '';
+        projects.forEach(project => {
+            const div = document.createElement('div');
+            div.className = 'project-item';
+            div.textContent = project.name;
+            div.onclick = () => selectProject(project.id);
+            if (project.id === activeProjectId) {
+                div.classList.add('active');
+            }
+            projectList.appendChild(div);
+        });
+    }
+
+    function selectProject(projectId) {
+        activeProjectId = projectId;
+        loadProjects();
+        loadThoughts();
+    }
+
+    function addThought() {
+        if (!activeProjectId) {
+            showMessage('Please select a project first', true);
+            return;
+        }
+
+        const content = document.getElementById('newThought').value.trim();
+        if (!content) {
+            showMessage('Please enter a thought', true);
+            return;
+        }
+
+        const thoughts = getThoughts();
+        thoughts.push({
+            id: Date.now(),
+            projectId: activeProjectId,
+            content,
+            timestamp: new Date().toISOString(),
+            color: '#ffffff'
+        });
+        saveThoughts(thoughts);
+
+        document.getElementById('newThought').value = '';
+        showMessage('Thought added successfully');
+        loadThoughts();
+    }
+
+    function loadThoughts() {
+        const thoughts = getThoughts();
+        const projects = getProjects();
+        const thoughtsGrid = document.getElementById('thoughts-grid');
+        thoughtsGrid.innerHTML = '';
+
+        const filteredThoughts = activeProjectId
+            ? thoughts.filter(t => t.projectId === activeProjectId)
+            : thoughts;
+
+        filteredThoughts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        filteredThoughts.forEach(thought => {
+            const project = projects.find(p => p.id === thought.projectId);
+            const div = document.createElement('div');
+            div.className = 'thought-card';
+            div.style.backgroundColor = thought.color;
+            div.innerHTML = `
+                <strong>${project ? project.name : 'Unknown Project'}</strong>
+                <div class="thought-content" contenteditable="true" onblur="updateThought(${thought.id}, this.textContent)">${thought.content}</div>
+                <small>${new Date(thought.timestamp).toLocaleString()}</small>
+                <div class="thought-actions">
+                    <input type="color" class="color-picker" value="${thought.color}" onchange="changeThoughtColor(${thought.id}, this.value)">
+                    <button class="delete-btn" onclick="deleteThought(${thought.id})">Delete</button>
+                </div>
+            `;
+            thoughtsGrid.appendChild(div);
+        });
+    }
+
+    function updateThought(thoughtId, newContent) {
+        const thoughts = getThoughts();
+        const thoughtIndex = thoughts.findIndex(t => t.id === thoughtId);
+        if (thoughtIndex !== -1) {
+            thoughts[thoughtIndex].content = newContent;
+            saveThoughts(thoughts);
+            showMessage('Thought updated successfully');
+        }
+    }
+
+    function changeThoughtColor(thoughtId, newColor) {
+        const thoughts = getThoughts();
+        const thoughtIndex = thoughts.findIndex(t => t.id === thoughtId);
+        if (thoughtIndex !== -1) {
+            thoughts[thoughtIndex].color = newColor;
+            saveThoughts(thoughts);
+            loadThoughts();
+        }
+    }
+
+    function deleteThought(thoughtId) {
+        const thoughts = getThoughts();
+        const updatedThoughts = thoughts.filter(t => t.id !== thoughtId);
+        saveThoughts(updatedThoughts);
+        loadThoughts();
+        showMessage('Thought deleted successfully');
+    }
+
+    function init() {
+        loadProjects();
+        loadThoughts();
+        showMessage('Application initialized successfully');
+    }
+
+    window.onload = init;
+    </script>
+</body>
+</html>
